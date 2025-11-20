@@ -1,4 +1,4 @@
-name: DashPay CI
+name: DashPay CI2
 
 on:
   push:
