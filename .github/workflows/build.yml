@@ -2,37 +2,64 @@ name: Build APK
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Получаем репозиторий
+      # --- Checkout ---
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # 2. Устанавливаем JDK
-      - name: Set up JDK
-        uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "17"
+          submodules: recursive
 
-      # 3. Даем права gradlew
-      - name: Make gradlew executable
+      # --- JDK ---
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      # --- Android SDK ---
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: 34
+          ndk-version: 28.0.12433566
+          build-tools: 34.0.0
+
+      # --- Gradle Cache ---
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper/
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # --- Permissions ---
+      - name: Make Gradlew executable
         run: chmod +x ./gradlew
 
-      # 4. Сборка APK
-      - name: Build APK
-        run: ./gradlew assembleDebug
+      # --- Build unsigned APK ---
+      - name: Assemble Release APK (unsigned)
+        run: ./gradlew assembleRelease --no-daemon
 
-      # 5. Сохранение артефакта (.apk)
-      - name: Upload APK
+      # --- List APKs ---
+      - name: List all APKs
+        run: |
+          echo "APK files in build outputs:"
+          find app/build/outputs/apk/ -name "*.apk"
+
+      # --- Upload APKs ---
+      - name: Upload Release APKs
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: app-release-apk
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
